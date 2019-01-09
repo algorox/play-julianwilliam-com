@@ -1,0 +1,456 @@
+<script type="text/javascript">
+  var webAuth = new auth0.WebAuth({
+    domain: '<%= auth0_domain %>',
+    clientID: '<%= auth0_frontend_client_id %>',
+    redirectUri: '<%= base_url %>',
+    scope: '<%= scope %>',
+    audience: '<%= api_audience %>',
+    //responseType: 'token id_token'
+  });
+
+  var userId;
+  var userMetadata = {};
+  var auth0Manage;
+  var shareScopes;
+  var shareResponseType;
+  roles = 'https://access/roles';
+  groups = 'https://access/groups';
+  permissions = 'https://access/permissions';
+
+  function parseJwt(token) {
+    var base64Url = token.split('.')[1];
+    var base64 = base64Url.replace('-', '+').replace('_', '/');
+    return JSON.parse(window.atob(base64));
+  };
+
+  function guid() {
+    function s4() {
+      return Math.floor((1 + Math.random()) * 0x10000)
+        .toString(16)
+        .substring(1);
+    }
+    return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+      s4() + '-' + s4() + s4() + s4();
+  };
+
+  //Function to create an array of Scopes set in the UI
+  function scopes() {
+    var scopesArrayChecked = [
+      $('#open-id').is(':checked'),
+      $('#-profile').is(':checked'),
+      $('#-email').is(':checked'),
+      $('#-read-current-user').is(':checked'),
+      $('#-update-current-user-metadata').is(':checked')
+    ];
+    var scopesArray = [
+      document.getElementById("open-id").value,
+      document.getElementById("-profile").value,
+      document.getElementById("-email").value,
+      document.getElementById("-read-current-user").value,
+      document.getElementById("-update-current-user-metadata").value
+    ];
+    var scopes = new Array;
+    for (i = 0; i < scopesArrayChecked.length; i++) {
+      if (scopesArrayChecked[i] === true) {
+        scopes.push(scopesArray[i]);
+      }
+    }
+    return scopes.join(" ");
+  };
+
+  //Function to create an array of Resonse Types set in the UI
+  function responseTypes() {
+    var tokenArrayChecked = [
+      $('#-token').is(':checked'),
+      $('#-id-token').is(':checked')
+    ];
+    var tokensArray = [
+      document.getElementById("-token").value,
+      document.getElementById("-id-token").value
+    ];
+    var tokens = new Array;
+    for (i = 0; i < tokenArrayChecked.length; i++) {
+      if (tokenArrayChecked[i] === true) {
+        tokens.push(tokensArray[i]);
+      }
+    }
+    return tokens.join(" ");
+  };
+
+  // UI event handlers
+  $(function () {
+    $('#silentauth-user').click(function (e) {
+      e.preventDefault();
+
+      shareScopes = scopes();
+      shareResponseType = responseTypes()
+
+      if (shareScopes.length === 0) {
+        $('#token_row').addClass('hidden');
+        $('#update_color_row').addClass('hidden');
+        $('#get_profile_row').addClass('hidden');
+        alert('You must select at least one scope');
+      }
+
+      else if (shareScopes.includes("openid") === false) {
+
+        $('#token_row').addClass('hidden');
+        $('#update_color_row').addClass('hidden');
+        $('#get_profile_row').addClass('hidden');
+        alert("You must include the scope of 'openid' to use:\n\n" + shareScopes + "\n\nYour Auth0 related local storage has been cleared");
+      }
+
+      else if (shareResponseType === '') {
+
+        $('#token_row').addClass('hidden');
+        $('#update_color_row').addClass('hidden');
+        $('#get_profile_row').addClass('hidden');
+        alert("You must a select a response type.\n\nYour Auth0 related local storage has been cleared");
+      }
+
+      else if (shareScopes.includes("openid") && (shareResponseType === 'token')) {
+
+        // generate and store state value
+        var state = guid();
+        window.localStorage.setItem('state', state);
+
+        webAuth.checkSession({
+          scope: shareScopes,
+          state: state,
+          responseType: shareResponseType
+        }, function (err, authResult) {
+
+          if (err) {
+            return alert('Check your Web Origins in your OIDC Client' + '\n\n' + JSON.stringify(err));
+          }
+
+          if (authResult && authResult.state !== requiredState) {
+            err = { error: 'invalid_state', errorDescription: 'The OAuth2 state does not match' };
+          }
+          var requiredState = window.localStorage.getItem('state');
+          window.localStorage.removeItem('state');
+
+          auth0Manage = new auth0.Management({
+            domain: '<%= auth0_domain %>',
+            token: authResult.accessToken
+          });
+
+          webAuth.client.userInfo(authResult.accessToken, function (err, user) {
+            if (err) {
+              return alert('error fetching profile: ' + JSON.stringify(err));
+            }
+
+            var access_Token = parseJwt(authResult.accessToken);
+
+            userId = user.sub;
+
+            $('#token').text(authResult.accessToken);
+            $('#profile').text(JSON.stringify(user, null, '  '));
+            $('#id_token').text('No ID Token requested in Reponse Type!');
+            $('#id_token_decoded').text('No ID Token requested in Reponse Type!');
+            $('#tokenAuthorizationField').text('No ID Token requested!');
+            $('#userInfoAuthorizationField').text(
+              'Roles ' + JSON.stringify(user[roles]) + '\n'
+              + 'Groups ' + JSON.stringify(user[groups]) + '\n'
+              + 'Permissions ' + JSON.stringify(user[permissions])
+            );
+            $('#access_token_decoded').text(JSON.stringify(access_Token, null, '  '));
+            $('#token_row').removeClass('hidden');
+            $('#update_color_row').removeClass('hidden');
+            $('#get_profile_row').removeClass('hidden');
+
+            alert('Request Sent' + '\n' + 'Scopes requested: ' + shareScopes + '\n' + 'Response Type requested: ' + shareResponseType);
+          });
+        });
+      }
+
+
+      else if (shareScopes.includes("openid") && (shareResponseType === 'token id_token')) {
+
+        // generate and store state value
+        var state = guid();
+        window.localStorage.setItem('state', state);
+
+        webAuth.checkSession({
+          scope: shareScopes,
+          state: state,
+          responseType: shareResponseType
+        }, function (err, authResult) {
+
+          if (err) {
+            return alert('Check your Web Origins in your OIDC Client' + '\n\n' + JSON.stringify(err));
+          }
+
+          if (authResult && authResult.state !== requiredState) {
+            err = { error: 'invalid_state', errorDescription: 'The OAuth2 state does not match' };
+          }
+
+          var id_Token = parseJwt(authResult.idToken);
+          var requiredState = window.localStorage.getItem('state');
+          window.localStorage.removeItem('state');
+
+          auth0Manage = new auth0.Management({
+            domain: '<%= auth0_domain %>',
+            token: authResult.accessToken
+          });
+
+          webAuth.client.userInfo(authResult.accessToken, function (err, user) {
+            if (err) {
+              return alert('error fetching profile: ' + JSON.stringify(err));
+            }
+
+            var access_Token = parseJwt(authResult.accessToken);
+
+            userId = user.sub;
+
+            $('#token').text(authResult.accessToken);
+            $('#profile').text(JSON.stringify(user, null, '  '));
+            $('#id_token').text(authResult.idToken);
+            $('#id_token_decoded').text(JSON.stringify(id_Token, null, '  '));
+            $('#access_token_decoded').text(JSON.stringify(access_Token, null, '  '));
+            $('#tokenAuthorizationField').text(
+              'Roles ' + JSON.stringify(id_Token[roles]) + '\n'
+              + 'Groups ' + JSON.stringify(id_Token[groups]) + '\n'
+              + 'Permissions ' + JSON.stringify(id_Token[permissions])
+            );
+            $('#userInfoAuthorizationField').text(
+              'Roles ' + JSON.stringify(user[roles]) + '\n'
+              + 'Groups ' + JSON.stringify(user[groups]) + '\n'
+              + 'Permissions ' + JSON.stringify(user[permissions])
+            );
+            $('#token_row').removeClass('hidden');
+            $('#update_color_row').removeClass('hidden');
+            $('#get_profile_row').removeClass('hidden');
+
+            alert('Request Sent' + '\n' + 'Scopes requested: ' + shareScopes + '\n' + 'Response Type requested: ' + shareResponseType);
+          });
+        });
+      }
+
+      else if (shareScopes.includes("openid") && (shareResponseType === 'id_token')) {
+
+        // generate and store state value
+        var state = guid();
+        window.localStorage.setItem('state', state);
+
+        webAuth.checkSession({
+          scope: shareScopes,
+          state: state,
+          responseType: shareResponseType
+        }, function (err, authResult) {
+
+          if (err) {
+            return alert('Check your Web Origins in your OIDC Client' + '\n\n' + JSON.stringify(err));
+          }
+
+          if (authResult && authResult.state !== requiredState) {
+            err = { error: 'invalid_state', errorDescription: 'The OAuth2 state does not match' };
+          }
+
+          var id_Token = parseJwt(authResult.idToken);
+          //var access_Token = parseJwt(authResult.accessToken);
+          var requiredState = window.localStorage.getItem('state');
+          window.localStorage.removeItem('state');
+
+          $('#token').text(authResult.accessToken + '\n\nNo Access Token requested in Reponse Type');
+          $('#profile').text('No Access Token requested in Reponse Type so cannot return UserInfo');
+          $('#id_token').text(authResult.idToken);
+          $('#id_token_decoded').text(JSON.stringify(id_Token, null, '  '));
+          $('#tokenAuthorizationField').text(
+            'Roles ' + JSON.stringify(id_Token[roles]) + '\n'
+            + 'Groups ' + JSON.stringify(id_Token[groups]) + '\n'
+            + 'Permissions ' + JSON.stringify(id_Token[permissions])
+          );
+          $('#userInfoAuthorizationField').text('No Access Token Requested!');
+          $('#access_token_decoded').text('No Access Token requested!');
+          $('#token_row').removeClass('hidden');
+          $('#update_color_row').addClass('hidden');
+          $('#get_profile_row').addClass('hidden');
+
+          alert('Request Sent' + '\n' + 'Scopes requested: ' + shareScopes + '\n' + 'Response Type requested: ' + shareResponseType + '\n\n' + 'IMPORTANT: With no access token requested API, many Auth0 API services will be unavailable such as Auth0 Authentication API userInfo, and Auth0 Management API services such as getUser and patchUserMetadata.\n\nSelect Response Type "token" to obtain access, along with the expected "scopes"');
+        });
+      }
+    });
+
+    $('#update-profile').click(function (e) {
+      e.preventDefault();
+
+      if (shareScopes.includes("update:current_user_metadata") && (userId !== undefined)) {
+
+        if (document.getElementById("user-data").value.length !== 0) {
+          auth0Manage.patchUserMetadata(userId, { "Color": document.getElementById("user-data").value },
+            function (err, updateResult) {
+              if (err) {
+                $('#update_color_row').addClass('hidden');
+              }
+
+              $('#update_response').text(JSON.stringify(updateResult.user_metadata, null, '  '));
+            });
+        }
+        else {
+          alert('Color field empty!');
+        }
+      }
+
+      else {
+        alert('Check your scopes - "update:current_user_metadata" and "openid" required');
+      }
+    });
+
+    $('#get-profile').click(function (e) {
+      e.preventDefault();
+      if (shareScopes.includes("read:current_user") && (userId !== undefined)) {
+        auth0Manage.getUser(userId,
+          function (err, getResult) {
+            if (err) {
+              $('#get_profile_row').addClass('hidden');
+            }
+
+            $('#get_profile_response').text(JSON.stringify(getResult, null, '  '));
+          });
+      }
+
+      else {
+        alert('Check your scopes - "read:current_user" and "openid" required');
+      }
+    });
+
+
+    $('#logout-user-oauth').click(function (e) {
+      e.preventDefault();
+      webAuth.logout({ client_id: '<%= auth0_sp_client_id %>', returnTo: '<%= base_url %>/', federate: true });
+    });
+
+    $('#logout-user-saml').click(function (e) {
+      e.preventDefault();
+      window.location.href = '/SAMLlogout';
+    });
+
+  });
+</script>
+
+<div align="center" class="row">
+  <br>
+  <div class="col-sm-2">
+    <img src="http://www.indinnovation.com/images/icons/innovation.png" height="100" width="100">
+  </div>
+  <div class="col-sm-8">
+    <h1 align="center">Auth0 Playground - SAML Sign In</h1>
+  </div>
+  <div class="col-sm-2">
+    <a class="btn btn-default" href="/" role="button">Home</a>
+  </div>
+</div>
+
+<hr>
+
+<div class="row">
+  <div class="col-sm-4">
+
+    <h3 align="center">SAML Session Index</h3>
+    <pre align="center"><%= sessionIndex %></pre>
+    <h3 align="center">SAML name_id</h3>
+    <pre align="center"><%= nameid %></pre>
+  </div>
+
+  <div align="center" class="col-sm-4">
+    <h3 align="center">Available Scopes</h3>
+    <form>
+      <input type="checkbox" id="open-id" value="openid" checked="checked"> openid
+      <input type="checkbox" id="-profile" value="profile"> profile
+      <input type="checkbox" id="-email" value="email"> email<br>
+      <input type="checkbox" id="-read-current-user" value="read:current_user"> read:current_user<br>
+      <input type="checkbox" id="-update-current-user-metadata" value="update:current_user_metadata">
+      update:current_user_metadata
+    </form>
+    <h3>Make an Auth Request</h3>
+    <input type="button" class="btn btn-default" id="silentauth-user" value="Request Token/s" /><br>
+  </div>
+
+  <div align="center" class="col-sm-4">
+    <h3 align="center">Select Response Type</h3>
+    <form>
+      <input type="checkbox" id="-token" value="token" checked="checked"> token
+      <input type="checkbox" id="-id-token" value="id_token" checked="checked"> id_token
+    </form>
+    <h3 align="center">Select Logout Type</h3>
+    <div align="center" class="col-s-2">
+      <input type="button" class="btn btn-default" id="logout-user-saml" value="Single Logout via SAML">
+    </div>
+    <br>
+    <div align="center" class="col-s-2">
+      <input type="button" class="btn btn-default" id="logout-user-oauth" value="Logout via OAUTH">
+    </div>
+
+  </div>
+
+</div>
+
+<hr>
+
+<div id="token_row" class="row hidden">
+
+  <h1 align="center">Authorization</h1>
+  <div class="col-sm-12">
+    <h3 align="center">ID Token Authorization</h3>
+    <pre align="center" id="tokenAuthorizationField"></pre>
+    <h3 align="center">UserInfo Authorization</h3>
+    <pre align="center" id="userInfoAuthorizationField"></pre>
+  </div>
+
+  <hr>
+
+  <h1 align="center">Auth0 Authentication API</h1>
+  <div class="col-m-6">
+    <h3 align="center"><i>Access Token</i></h3>
+    <pre id="token"></pre>
+  </div>
+
+  <div class="col-m-6">
+    <h3 align="center"><i>Access Token Decoded</i></h3>
+    <pre id="access_token_decoded"></pre>
+  </div>
+
+  <div class="col-m-6">
+    <h3 align="center"><i>ID Token</i></h3>
+    <pre id="id_token"></pre>
+  </div>
+
+  <div class="col-m-6">
+    <h3 align="center"><i>ID Token Decoded</i></h3>
+    <pre id="id_token_decoded"></pre>
+  </div>
+
+  <div class="col-m-6">
+    <h3 align="center"><i>User Info Profile</i></h3>
+    <pre id="profile"></pre>
+  </div>
+
+</div>
+
+<div id="update_color_row" class="row hidden">
+  <hr>
+  <h1 align="center">Auth0 Management API</h1>
+  <div align="center" class="col-m-6">
+    <h3 align="center"><i>Update User Metadata using patchUserMetadata API call</i></h3>
+    <form>
+      <input type="text" id="user-data" value="" placeholder="Add a colour">
+      <input type="submit" id="update-profile" value="Add">
+    </form>
+  </div>
+  <div class="col-m-6">
+    <h3 align="center"><i>patchUserMetadata Response</i></h3>
+    <pre align="center" id="update_response">Add a colour to see your update</pre>
+  </div>
+</div>
+
+<div id="get_profile_row" class="row hidden">
+  <div align="center" class="col-m-6">
+    <h3 align="center"><i>Get User using getUser API call</i></h3>
+    <input type="button" align="center" class="btn btn-default" id="get-profile" value="Get User" />
+  </div>
+  <div class="col-m-6">
+    <h3 align="center"><i>getUser Response</i></h3>
+    <pre id="get_profile_response">Get User Response (requires read:user_metadata scope)</pre>
+  </div>
+</div>

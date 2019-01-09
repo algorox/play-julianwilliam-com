@@ -1,0 +1,76 @@
+<script type="text/javascript">
+
+    function submitDeletion(username, password) {
+
+        var loginUsername = username;
+        var loginPassword = password;
+
+        var data = "{\n\t\"username\": \"" + loginUsername + "\",\n\t\"password\": \"" + loginPassword + "\"}"
+
+
+        $.ajax({
+            url: '<%= legacy_delete_user_url %>',
+            method: 'POST',
+            headers: {
+                "Content-Type": "application/json",
+            },
+            processData: false,
+            data: data,
+            success: function (data) {
+                $('#authn_response').text(JSON.stringify(data));
+            },
+            error: function (data) {
+                $('#authn_response').text('Authentication Failed\n\nYou must enter your existing credentials to delete your password\n\n' + data.responseText);
+            }
+        })
+    }
+
+
+
+    $(function () {
+
+        $('#delete-user-form').on('submit', function (e) {
+            e.preventDefault();
+
+            username = document.getElementById('txtUsername').value
+            password = document.getElementById('txtPassword').value
+
+            submitDeletion(username, password);
+        })
+
+    })
+
+</script>
+
+<head>
+    <link rel="shortcut icon" type="image/x-icon" href="public/favicon.ico" />
+</head>
+
+<br>
+<div align="center" class="row">
+    <div class="col-sm-2">
+        <img src="https://image.flaticon.com/icons/png/512/55/55160.png" height="100" width="100">
+    </div>
+    <div class="col-sm-8">
+        <h1 align="center">Legacy Delete User</h1>
+    </div>
+    <div class="col-sm-2">
+        <br>
+        <a class="btn btn-default" href="/" role="button">Home</a>
+    </div>
+</div>
+
+<div align="center" id="login_row" class="row">
+    <div class="col-sm-12">
+        <form id=delete-user-form action="/login_form" method="post">
+            <input type="email" placeholder="Email" id="txtUsername">
+            <br>
+            <input type="password" placeholder="Current Password" id="txtPassword">
+            <br>
+            <input type="submit" value="Delete Me">
+        </form>
+        <pre align="center" id="authn_response">Please verify your credentials to delete your account</pre>
+    </div>
+    <h6><i>Please note: As this demo is on a Free Heroku licence, SSL is <b>NOT</b> configured</i></h6>
+    <h6><i>For Production use, SSL <b>MUST</b> be configured</i></h6>
+</div>

@@ -1,0 +1,124 @@
+<script type="text/javascript">
+  var webAuth = new auth0.WebAuth({
+    domain: '<%= auth0_domain %>',
+    clientID: '<%= auth0_frontend_client_id %>'
+  });
+
+  $(function () {
+    $('#oidcLogin').click(function (e) {
+      e.preventDefault();
+      webAuth.authorize({
+        redirectUri: '<%= redirectUri %>',
+        scope: 'openid',
+        audience: '<%= api_audience %>',
+        responseType: 'token id_token'
+      }
+      );
+    });
+
+  });
+
+
+  function isEmail(email) {
+    var regex = /^([a-zA-Z0-9_.+-])+\@(([a-zA-Z0-9-])+\.)+([a-zA-Z0-9]{2,4})+$/;
+    return regex.test(email);
+  }
+  $(function () {
+
+    document.getElementById("thankyou").style.display = "none";
+    document.getElementById("checkout_response").style.display = "none";
+    document.getElementById("oidcLogin").style.display = "none";
+
+    $('#checkout').click(function (e) {
+      e.preventDefault();
+
+      if ($.trim($("#user-email").val()) === "" || (isEmail($("#user-email").val()) === false)) {
+        alert('Please enter a valid email address');
+        return false;
+      }
+
+      $.ajax({
+        method: "GET",
+        url: '<%= api_services_host %>' + "/api/public/createPWlessUser?email=" + document.getElementById("user-email").value,
+
+        success: function (data) {
+          $('#checkout_response').text("Your ID is " + data.user_id + '\n\n' + "You can now Sign In with your email address of\n" + data.email)
+          document.getElementById("thankyou").style.display = "block";
+          document.getElementById("checkout_response").style.display = "block";
+          document.getElementById("checkout-form").style.display = "none";
+          document.getElementById("oidcLogin").style.display = "block";
+        },
+        error: function (data) {
+
+          $('#checkout_response').text(JSON.stringify(data, null, '  '))
+          document.getElementById("checkout_response").style.display = "block";
+          document.getElementById("checkout-form").style.display = "none";
+        }
+      });
+
+    });
+
+  })
+
+</script>
+
+<div id="header" align="center" class="row">
+  <br>
+  <div class="col-sm-2">
+    <img src="https://image.flaticon.com/icons/png/512/102/102655.png" height="100" width="100">
+  </div>
+  <div class="col-sm-8">
+    <h1 align="center">Checkout</h1>
+    <h2 align="center" id="usersemail"></h2>
+  </div>
+  <div class="col-sm-2">
+    <a class="btn btn-default" href="/" role="button">Home</a>
+  </div>
+</div>
+
+<hr>
+
+<div id="selector_row" class="row">
+
+  <div class="col-sm-3">
+
+  </div>
+
+  <div id="buttons-row" align="center" class="col-sm-6">
+
+    <div id="checkout-form">
+      <h3 align="center">Your Items</h3>
+      <h5 align="center">Playstation 4 Pro £349.99</h5>
+      <h5 align="center">Bloodborne £27.99</h5>
+      <h5 align="center">Official PS4 Controller £44.99</h5>
+      <form>
+        <input type="text" value="" placeholder="First name">
+        <br>
+        <input type="text" value="" placeholder="Last name">
+        <br>
+        <input type="text" value="" placeholder="Address Line 1">
+        <br>
+        <input type="text" value="" placeholder="Address Line 2">
+        <br>
+        <input type="text" value="" placeholder="Postcode">
+        <br>
+        <input type="text" value="" placeholder="Visa/Mastercard">
+        <br>
+        <input type="email" id="user-email" value="" placeholder="julian@auth0.com">
+        <br>
+        <br>
+        <input type="submit" id="checkout" value="Checkout">
+      </form>
+    </div>
+    <h3 align="center" id="thankyou">Thank you for your purchase</h3>
+    <pre align="center" id="checkout_response"></pre>
+
+    <br>
+    <br>
+    <a class="btn btn-default" id=oidcLogin role="button">Sign In</a>
+
+
+  </div>
+
+
+</div>

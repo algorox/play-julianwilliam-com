@@ -1,0 +1,342 @@
+<script type="text/javascript">
+  var webAuth = new auth0.WebAuth({
+    domain: '<%= auth0_domain %>',
+    clientID: '<%= auth0_frontend_client_id %>',
+    redirectUri: '<%= api_services_redirectUri %>',
+    scope: '<%= api_services_scopes %>',
+    audience: '<%= api_services_audience %>',
+    responseType: 'token'
+  });
+
+  var userId;
+  var userMetadata = {};
+  var auth0Manage;
+  var shareScopes;
+  var shareResponseType;
+  var access_Token;
+  roles = 'https://access/roles';
+  groups = 'https://access/groups';
+  permissions = 'https://access/permissions';
+
+  function handleAuthentication() {
+
+    webAuth.parseHash({ hash: window.location.hash, __enableIdPInitiatedLogin: true }, function (err, authResult) {
+      if (err) {
+        //window.location.href='/';
+        return console.log(err);
+      }
+
+      if (authResult !== null) {
+
+        var expiry = JSON.stringify(
+          authResult.expiresIn * 1000 + new Date().getTime()
+        );
+
+        setSession(authResult.accessToken, authResult.idToken, expiry);
+
+        scheduleRenewal(expiry);
+      }
+
+      else {
+        webAuth.authorize({
+          redirectUri: '<%= api_services_redirectUri %>',
+          scope: '<%= api_services_scopes %>',
+          audience: '<%= api_services_audience %>',
+          responseType: 'token id_token'
+        })
+      }
+    })
+  }
+
+  window.onload = handleAuthentication();
+
+  function renewToken() {
+    webAuth.checkSession({},
+      function (err, authResult) {
+        if (err) {
+          console.log(err)
+          webAuth.authorize({
+            redirectUri: '<%= api_services_redirectUri %>',
+            scope: '<%= api_services_scopes %>',
+            audience: '<%= api_services_audience %>',
+            responseType: 'token id_token'
+          })
+        } else {
+          var expiry = JSON.stringify(
+            authResult.expiresIn * 1000 + new Date().getTime()
+          );
+          setSession(authResult.accessToken, authResult.idToken, expiry);
+          scheduleRenewal(expiry);
+        }
+      }
+    );
+  }
+
+  function scheduleRenewal(expiry) {
+    //var expiresAt = JSON.parse(window.localStorage.getItem('expires_at'));
+    var delay = expiry - Date.now();
+    if (delay > 5000) {
+      tokenRenewalTimeout = setTimeout(function () {
+        renewToken();
+      }, delay);
+    }
+  }
+
+  function parseJwt(token) {
+    var base64Url = token.split('.')[1];
+    var base64 = base64Url.replace('-', '+').replace('_', '/');
+    return JSON.parse(window.atob(base64));
+  };
+
+  function guid() {
+    function s4() {
+      return Math.floor((1 + Math.random()) * 0x10000)
+        .toString(16)
+        .substring(1);
+    }
+    return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+      s4() + '-' + s4() + s4() + s4();
+  };
+
+  //Function to create an array of Scopes set in the UI
+  function scopes() {
+    var scopesArrayChecked = [
+      $('#write-user-scope').is(':checked'),
+      $('#read-user-scope').is(':checked')
+    ];
+    var scopesArray = [
+      document.getElementById("write-user-scope").value,
+      document.getElementById("read-user-scope").value
+    ];
+    var scopes = new Array;
+    for (i = 0; i < scopesArrayChecked.length; i++) {
+      if (scopesArrayChecked[i] === true) {
+        scopes.push(scopesArray[i]);
+      }
+    }
+    return scopes.join(" ");
+  };
+
+  function setSession(access_token, id_token, expires_in) {
+
+    var expiresAt = JSON.stringify(
+      expires_in * 1000 + new Date().getTime()
+    );
+
+    var access_Token = parseJwt(access_token);
+    var id_Token = parseJwt(id_token);
+    window.location.hash = '';
+    // Now you have the user's information
+
+  }
+
+  //Function to create an array of Resonse Types set in the UI
+  function responseTypes() {
+    var tokenArrayChecked = [
+      $('#-token').is(':checked'),
+      $('#-id-token').is(':checked')
+    ];
+    var tokensArray = [
+      document.getElementById("-token").value,
+      document.getElementById("-id-token").value
+    ];
+    var tokens = new Array;
+    for (i = 0; i < tokenArrayChecked.length; i++) {
+      if (tokenArrayChecked[i] === true) {
+        tokens.push(tokensArray[i]);
+      }
+    }
+    return tokens.join(" ");
+  };
+
+  // UI event handlers
+  $(function () {
+
+    $('#silentauth-user').click(function (e) {
+      e.preventDefault();
+
+      shareScopes = scopes();
+      shareResponseType = responseTypes()
+
+      if (shareScopes.length === 0) {
+        alert('You must select at least one scope');
+      }
+
+      else if (shareResponseType === '') {
+        alert("You must a select a response type.\n\nYour Auth0 related local storage has been cleared");
+      }
+
+      else if (shareResponseType === 'id_token') {
+        alert("We shouldn't use ID Tokens to Access APIs - so go get an Access Token instead by selecting 'token' in Response Type");
+      }
+
+      else if (shareResponseType === "token") {
+
+        // generate and store state value
+        var state = guid();
+        window.localStorage.setItem('state', state);
+
+        webAuth.checkSession({
+          scope: shareScopes,
+          state: state,
+          responseType: responseType
+        }, function (err, authResult) {
+
+          if (err) {
+            return alert('Check your Web Origins in your OIDC Client' + '\n\n' + JSON.stringify(err));
+          }
+
+          if (authResult && authResult.state !== requiredState) {
+            err = { error: 'invalid_state', errorDescription: 'The OAuth2 state does not match' };
+          }
+
+          var requiredState = window.localStorage.getItem('state');
+          window.localStorage.removeItem('state');
+
+          var expiresAt = JSON.stringify(
+            authResult.expiresIn * 1000 + new Date().getTime()
+          );
+
+          alert('Request Sent' + '\n' + 'Scopes requested: ' + shareScopes + '\n' + 'Response Type requested: ' + shareResponseType);
+
+        });
+      }
+
+      else if (shareResponseType.includes("token") && shareResponseType.includes("id_token")) {
+
+        // generate and store state value
+        var state = guid();
+        window.localStorage.setItem('state', state);
+
+        webAuth.checkSession({
+          scope: shareScopes,
+          state: state,
+          responseType: shareResponseType
+        }, function (err, authResult) {
+          var requiredState = window.localStorage.getItem('state');
+
+          if (err) {
+            return alert('Check your Web Origins in your OIDC Client' + '\n\n' + JSON.stringify(err));
+          }
+
+          if (authResult && authResult.state !== requiredState) {
+            err = { error: 'invalid_state', errorDescription: 'The OAuth2 state does not match' };
+          }
+
+
+          window.localStorage.removeItem('state');
+
+          var expiresAt = JSON.stringify(
+            authResult.expiresIn * 1000 + new Date().getTime()
+          );
+          alert('Request Sent' + '\n' + 'Scopes requested: ' + shareScopes + '\n' + 'Response Type requested: ' + shareResponseType);
+
+        });
+      }
+    });
+
+    $('#who-is-accessing').click(function (e) {
+      e.preventDefault();
+
+      var freshAccessToken;
+      var state = guid();
+      window.localStorage.setItem('state', state);
+
+      webAuth.checkSession({
+        scope: 'read:user',
+        state: state,
+        responseType: 'token'
+      }, function (err, authResult) {
+
+        if (err) {
+          webAuth.authorize({
+            redirectUri: '<%= api_services_redirectUri %>',
+            scope: '<%= api_services_scopes %>',
+            audience: '<%= api_services_audience %>',
+            responseType: 'token id_token'
+          })
+          console.log('Reauth due to error')
+        }
+        var requiredState = window.localStorage.getItem('state');
+        if (authResult && authResult.state !== requiredState) {
+          err = { error: 'invalid_state', errorDescription: 'The OAuth2 state does not match' };
+        }
+
+        var requiredState = window.localStorage.removeItem('state');
+        $.ajax({
+
+          //console.log(freshAccessToken)
+          method: "GET",
+          url: '<%= api_services_host %>' + "/api/private/whoIsAccessing",
+          headers: { "Authorization": "Bearer " + authResult.accessToken },
+          success: function (data) {
+            $('#who_is_accessing_response').text(JSON.stringify(data, null, '  '))
+          },
+          error: function (data) {
+            if (data.status === 403) {
+              $('#who_is_accessing_response').text("Try adding 'read:user' to your scopes")
+            }
+            else {
+              $('#who_is_accessing_response').text(JSON.stringify(data, null))
+            }
+          }
+        });
+      });
+    });
+
+    $('#logout-user-oauth').click(function (e) {
+      e.preventDefault();
+      webAuth.logout({ client_id: '<%= auth0_frontend_client_id %>', returnTo: '<%= base_url %>/', federate: true });
+    });
+
+  });
+
+</script>
+
+<div align="center" class="row">
+  <br>
+  <div class="col-sm-2">
+    <img src="http://www.indinnovation.com/images/icons/innovation.png" height="100" width="100">
+  </div>
+  <div class="col-sm-8">
+    <h1 align="center">Auth0 Playground - API Sign In</h1>
+  </div>
+  <div class="col-sm-2">
+    <a class="btn btn-default" href="/" role="button">Home</a>
+  </div>
+</div>
+
+<hr>
+
+<div id="selector_row" class="row">
+
+  <div align="center" class="col-sm-3">
+    <h3 align="center">Available Scopes</h3>
+    <form>
+      <input type="checkbox" id="write-user-scope" value="write:user"> write:user
+      <input type="checkbox" id="read-user-scope" value="read:user" checked="checked"> read:user
+    </form>
+    <h3>Make an Auth Request</h3>
+    <input type="button" class="btn btn-default" id="silentauth-user" value="Request Token/s" /><br>
+  </div>
+
+  <div align="center" class="col-sm-6">
+    <h3>Call the API</h3>
+    <input type="button" class="btn btn-default" id="who-is-accessing" value="Call API" />
+    <h3 align="center">User Accessing the API</h3>
+    <pre id="who_is_accessing_response">Click 'Call the API' You must have 'read:user' scope! </pre>
+  </div>
+
+  <div align="center" class="col-sm-3">
+    <h3 align="center">Select Response Type</h3>
+    <form>
+      <input type="checkbox" id="-token" value="token" checked="checked"> token
+      <input type="checkbox" id="-id-token" value="id_token" checked="checked"> id_token
+    </form>
+    <h3 align="center">Logout</h3>
+    <div align="center" class="col-s-2">
+      <input type="button" class="btn btn-default" id="logout-user-oauth" value="Logout">
+    </div>
+  </div>
+  <hr>
+</div>

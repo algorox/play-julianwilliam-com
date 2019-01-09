@@ -1,0 +1,98 @@
+<script type="text/javascript">
+
+    window.onload = function () {
+        document.getElementById("legacyChangePassword").style.display = "none";
+    };
+
+    function submitLogin(username, password) {
+
+        var loginUsername = username;
+        var loginPassword = password;
+
+        var data = "{\n\t\"username\": \"" + loginUsername + "\",\n\t\"password\": \"" + loginPassword + "\"}"
+
+
+        $.ajax({
+            url: '<%= legacy_login_url %>',
+            method: 'POST',
+            headers: {
+                "Content-Type": "application/json",
+            },
+            processData: false,
+            data: data,
+            success: function (data) {
+                $('#authn_response').text('You are Signed In!\n\nThe Access Token must not be returned to the browser when using this Sign In Approach\n\nThe A0 User ID is all that is returned by this demo of a Legacy Login API as below\n\n' + JSON.stringify(data, null, '  '));
+                document.getElementById("legacyResetPassword").style.display = "none";
+                document.getElementById("legacySignUp").style.display = "none";
+                document.getElementById("legacyChangePassword").style.display = "block";
+            },
+            error: function (data) {
+                $('#authn_response').text('Authentication Failed\n\n' + data.responseText);
+            }
+        })
+    }
+
+
+
+    $(function () {
+
+        $('#login-form').on('submit', function (e) {
+            e.preventDefault();
+
+            username = document.getElementById('txtUsername').value
+            password = document.getElementById('txtPassword').value
+
+            submitLogin(username, password);
+        })
+
+    })
+
+</script>
+
+<head>
+    <link rel="shortcut icon" type="image/x-icon" href="public/favicon.ico" />
+</head>
+
+<br>
+<div align="center" class="row">
+    <div class="col-sm-2">
+        <img src="https://image.flaticon.com/icons/png/512/55/55160.png" height="100" width="100">
+    </div>
+    <div class="col-sm-8">
+        <h1 align="center">Legacy Login</h1>
+    </div>
+    <div class="col-sm-2">
+        <br>
+        <a class="btn btn-default pull-right" id="legacySignUp" href="/legacySignUp" role="button">Legacy Sign Up</a>
+        <br>
+        <br>
+        <a class="btn btn-default pull-right" id="legacyResetPassword" href="/legacyResetPassword" role="button">Legacy
+            Reset Password</a>
+        <br>
+        <br>
+        <a class="btn btn-default pull-right" id="legacyDeleteUser" href="/legacyDeleteUser" role="button">Legacy
+            Delete My Account</a>
+        <br>
+        <br>
+        <a class="btn btn-default pull-right" id="legacyChangePassword" href="/legacyChangePassword" role="button">Legacy
+            Change Password</a>
+    </div>
+</div>
+</div>
+
+<div align="center" id="login_row" class="row">
+    <div class="col-sm-12">
+        <form id=login-form action="/login_form" method="post">
+            <input type="email" placeholder="Email" id="txtUsername">
+            <br>
+            <input type="password" placeholder="Password" id="txtPassword">
+            <br>
+            <br>
+            <input type="submit" value="Sign In">
+        </form>
+        <pre align="center" id="authn_response">You are not Signed In</pre>
+    </div>
+    <br>
+    <h6><i>Please note: As this demo is on a Free Heroku licence, SSL is <b>NOT</b> configured</i></h6>
+    <h6><i>For Production use, SSL <b>MUST</b> be configured</i></h6>
+</div>

@@ -1,0 +1,135 @@
+<script type="text/javascript">
+
+  var webAuth = new auth0.WebAuth({
+    domain: '<%= auth0_domain %>',
+    clientID: '<%= auth0_frontend_client_id %>'
+  });
+
+  $(function () {
+    $('#oidcLogin').click(function (e) {
+      e.preventDefault();
+      webAuth.authorize({
+        redirectUri: '<%= redirectUri %>',
+        scope: 'openid',
+        audience: '<%= api_audience %>',
+        responseType: 'token id_token'
+      }
+      );
+    });
+
+    $('#apiLogin').click(function (e) {
+      e.preventDefault();
+      webAuth.authorize({
+        redirectUri: '<%= api_services_redirectUri %>',
+        scope: '<%= api_services_scopes %>',
+        audience: '<%= api_services_audience %>',
+        responseType: 'token id_token'
+      }
+      );
+    });
+
+    $('#authNLogin').click(function (e) {
+      e.preventDefault();
+      webAuth.authorize({
+        redirectUri: '<%= authN_redirectUri %>',
+        scope: 'openid email',
+        audience: '<%= api_audience %>',
+        responseType: 'token id_token'
+      }
+      );
+    });
+
+    $('#federatedLogin').click(function (e) {
+      e.preventDefault();
+      webAuth.authorize({
+        redirectUri: '<%= authN_redirectUri %>',
+        scope: 'openid email',
+        audience: '<%= api_audience %>',
+        responseType: 'token id_token',
+        connection: '<%= saml_connection %>'
+      }
+      );
+    });
+
+
+    $('#resetPWviaSMS').click(function (e) {
+      e.preventDefault();
+
+      var webAuth = new auth0.WebAuth({
+        domain: '<%= auth0_domain %>',
+        clientID: '<%= auth0_sms_pwreset_clientID %>'
+      });
+
+      webAuth.authorize({
+        redirectUri: '<%= auth0_sms_pwreset_redirecturi %>',
+        scope: 'openid profile email read:current_user update:current_user_metadata',
+        audience: '<%= api_audience %>',
+        responseType: 'token id_token',
+        prompt: 'login'
+      }
+      );
+    });
+
+    $('#postLegacyLogin').click(function (e) {
+      e.preventDefault();
+      webAuth.authorize({
+        redirectUri: '<%= redirectUri %>',
+        scope: 'openid',
+        audience: '<%= api_audience %>',
+        responseType: 'token id_token',
+        connection: 'AWS-MySQL-Auth0-Schema'
+      }
+      );
+    });
+
+  });
+
+
+</script>
+
+<head>
+  <link rel="shortcut icon" type="image/x-icon" href="public/favicon.ico" />
+</head>
+
+<br>
+<div align="center" class="row">
+  <div class="col-sm-2">
+    <img src="https://image.flaticon.com/icons/png/512/55/55160.png" height="100" width="100">
+    <h5>Legacy</h5>
+    <br>
+    <a class="btn btn-default pull-left" href="/legacyLogin" role="button">Legacy Login</a>
+    <br>
+    <br>
+    <a class="btn btn-default pull-left" id=postLegacyLogin role="button">Post Legacy Login</a>
+    <br>
+    <br>
+  </div>
+  <div class="col-sm-8">
+    <h1 align="center">Auth0 Playground</h1>
+  </div>
+  <div class="col-sm-2">
+    <img src="http://www.indinnovation.com/images/icons/innovation.png" height="100" width="100">
+    <h5>Next Gen</h5>
+    <br>
+    <a class="btn btn-default pull-right" href="/checkout" role="button">Checkout</a>
+    <br>
+    <br>
+    <a class="btn btn-default pull-right" href="/samlLogin" role="button">SAML Sign In</a>
+    <br>
+    <br>
+    <a class="btn btn-default pull-right" id=oidcLogin role="button">OAUTH2.0 Sign In</a>
+    <br>
+    <br>
+    <a class="btn btn-default pull-right" id=apiLogin role="button">Access the API</a>
+    <br>
+    <br>
+    <a class="btn btn-default pull-right" id=authNLogin role="button">Authorisation Example</a>
+    <br>
+    <br>
+    <a class="btn btn-default pull-right" id=federatedLogin role="button">Portal SAML Sign In</a>
+    <br>
+    <br>
+    <a class="btn btn-default pull-right" id=resetPWviaSMS role="button">PW Reset with SMS</a>
+    <br>
+    <br>
+  </div>

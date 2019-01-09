@@ -1,0 +1,275 @@
+<script type="text/javascript">
+
+  var webAuth = new auth0.WebAuth({
+    domain: '<%= auth0_domain %>',
+    clientID: '<%= auth0_frontend_client_id %>',
+    redirectUri: '<%= authN_redirectUri %>',
+    scope: 'openid email',
+    audience: '<%= api_audience %>',
+    responseType: 'token id_token'
+  });
+
+  var access_token;
+  var id_token;
+  var expires_in;
+  var access_Token_parsed;
+  var id_Token_parsed;
+  roles = 'https://access/roles';
+  groups = 'https://access/groups';
+  permissions = 'https://access/permissions';
+
+  function handleAuthentication() {
+
+    webAuth.parseHash({ hash: window.location.hash, __enableIdPInitiatedLogin: true }, function (err, authResult) {
+      if (err) {
+        //window.location.href='/';
+        return console.log(err);
+      }
+
+      if (authResult !== null) {
+
+        var expiry = JSON.stringify(
+          authResult.expiresIn * 1000 + new Date().getTime()
+        );
+
+        setSession(authResult.accessToken, authResult.idToken, expiry);
+
+        scheduleRenewal(expiry);
+      }
+
+      else {
+        webAuth.authorize({
+          redirectUri: '<%= authN_redirectUri %>',
+          scope: 'openid email',
+          audience: '<%= api_audience %>',
+          responseType: 'token id_token'
+        })
+      }
+    })
+  }
+
+  window.onload = handleAuthentication();
+
+  function renewToken() {
+    webAuth.checkSession({},
+      function (err, authResult) {
+        if (err) {
+          console.log(err)
+          webAuth.authorize({
+            redirectUri: '<%= authN_redirectUri %>',
+            scope: 'openid email',
+            audience: '<%= api_audience %>',
+            responseType: 'token id_token'
+          })
+        } else {
+          var expiry = JSON.stringify(
+            authResult.expiresIn * 1000 + new Date().getTime()
+          );
+          setSession(authResult.accessToken, authResult.idToken, expiry);
+          scheduleRenewal(expiry);
+        }
+      }
+    );
+  }
+
+  function scheduleRenewal(expiry) {
+    //var expiresAt = JSON.parse(window.localStorage.getItem('expires_at'));
+    var delay = expiry - Date.now();
+    if (delay > 5000) {
+      tokenRenewalTimeout = setTimeout(function () {
+        renewToken();
+      }, delay);
+    }
+  }
+
+  function parseJwt(token) {
+    var base64Url = token.split('.')[1];
+    var base64 = base64Url.replace('-', '+').replace('_', '/');
+    return JSON.parse(window.atob(base64));
+  };
+
+  function setSession(access_token, id_token, expires_in) {
+    webAuth.client.userInfo(access_token, function (err, user) {
+      if (err) {
+        return alert('error fetching profile: ' + JSON.stringify(err));
+      }
+
+      var expiresAt = JSON.stringify(
+        expires_in * 1000 + new Date().getTime()
+      );
+
+      id_Token_parsed = parseJwt(id_token);
+
+      $('#id_Token_parsed_roles_field').text(
+        'Roles ' + JSON.stringify(id_Token_parsed[roles]) + '\n'
+        + 'Groups ' + JSON.stringify(id_Token_parsed[groups]) + '\n'
+        + 'Permissions ' + JSON.stringify(id_Token_parsed[permissions])
+      );
+      $('#user_info_roles_field').text(
+        'Roles ' + JSON.stringify(user[roles]) + '\n'
+        + 'Groups ' + JSON.stringify(user[groups]) + '\n'
+        + 'Permissions ' + JSON.stringify(user[permissions])
+      );
+      window.location.hash = '';
+      document.getElementById("usersemail").innerText = user.email;
+
+      if ((user[roles].length === 0) && (user[groups].length === 0) && (user[permissions].length === 0)) {
+        document.getElementById("no-authorisation").style.display = "inline-block";
+        document.querySelector('h1').innerText = 'B2C - Welcome!';
+        document.getElementById("headerImage").src = 'https://png.pngtree.com/svg/20170110/consumer_1295337.png';
+        document.getElementById("content-block").style.display = "inline-block";
+        document.getElementById("content-block").innerText = "The Latest News and Updates\n Read More!";
+      }
+
+      if (user[roles].length > 3) {
+        document.getElementById("all-roles-button").style.display = "inline-block";
+      }
+
+      if (user[groups].length > 3) {
+        document.getElementById("all-groups-button").style.display = "inline-block";
+      }
+
+      if (user[permissions].length > 1) {
+        document.getElementById("all-permissions-button").style.display = "inline-block";
+      }
+
+      if (user[roles].includes('Federated User')) {
+        document.getElementById("federated-user-button").style.display = "inline-block";
+        document.querySelector('h1').innerText = 'B2B - Welcome!';
+        document.getElementById("headerImage").src = 'https://img.icons8.com/ios/1600/b2b.png';
+      }
+
+      if (user[roles].includes('CSA')) {
+        document.getElementById("csa-only-button").style.display = "inline-block";
+        document.querySelector('h1').innerText = 'B2E - Welcome!';
+        document.getElementById("headerImage").src = 'https://cdn.auth0.com/blog/auth0-japanese-localization/hero.png';
+      }
+
+
+
+      if (user[roles].includes('Manager')) {
+        document.getElementById("manager-only-button").style.display = "inline-block";
+      }
+
+      if (user[roles].includes('Executive')) {
+        document.getElementById("executive-only-button").style.display = "inline-block";
+      }
+
+      if (user[groups].includes('EMEA')) {
+        document.getElementById("emea-only-button").style.display = "inline-block";
+      }
+
+      if (user[groups].includes('US')) {
+        document.getElementById("us-only-button").style.display = "inline-block";
+      }
+
+      if (user[groups].includes('APAC')) {
+        document.getElementById("apac-only-button").style.display = "inline-block";
+      }
+
+      if (user[permissions].includes('read:content')) {
+        document.getElementById("read-only-button").style.display = "inline-block";
+        document.getElementById("content-block").style.display = "inline-block";
+      }
+
+      if (user[permissions].includes('write:content')) {
+        document.getElementById("write-only-button").style.display = "inline-block";
+        document.getElementById("content-block").style.display = "inline-block";
+        document.getElementById("content-block").readOnly = false;
+      }
+
+
+    });
+  }
+
+  window.onload = function () {
+    document.getElementById("emea-only-button").style.display = "none";
+    document.getElementById("us-only-button").style.display = "none";
+    document.getElementById("apac-only-button").style.display = "none";
+    document.getElementById("csa-only-button").style.display = "none";
+    document.getElementById("manager-only-button").style.display = "none";
+    document.getElementById("executive-only-button").style.display = "none";
+    document.getElementById("federated-user-button").style.display = "none";
+    document.getElementById("all-roles-button").style.display = "none";
+    document.getElementById("all-groups-button").style.display = "none";
+    document.getElementById("all-permissions-button").style.display = "none";
+    document.getElementById("no-authorisation").style.display = "none";
+    document.getElementById("read-only-button").style.display = "none";
+    document.getElementById("write-only-button").style.display = "none";
+    document.getElementById("content-block").style.display = "none";
+    document.getElementById("content-block").readOnly = true;
+
+  };
+  // UI event handlers
+  $(function () {
+
+    $('#logout-user-oauth').click(function (e) {
+      e.preventDefault();
+      webAuth.logout({ client_id: '<%= auth0_frontend_client_id %>', returnTo: '<%= base_url %>/', federate: true });
+    });
+  });
+
+</script>
+
+<div id="header" align="center" class="row">
+  <br>
+  <div class="col-sm-2">
+    <img id="headerImage" height="100" width="100">
+  </div>
+  <div class="col-sm-8">
+    <h1 align="center">Authorisation Example</h1>
+    <h2 align="center" id="usersemail"></h2>
+  </div>
+  <div class="col-sm-2">
+    <a class="btn btn-default" href="/" role="button">Home</a>
+  </div>
+</div>
+
+<hr>
+
+<div id="selector_row" class="row">
+
+  <div class="col-sm-3">
+    <h3><i>By default, the Authorisation example uses the 'openid' and 'email' scopes</i></h3>
+  </div>
+
+  <div id="buttons-row" align="center" class="col-sm-6">
+    <h3 align="center">What Authorisation do I have as defined by the ID Token?</h3>
+    <pre id="id_Token_parsed_roles_field"></pre>
+    <h3 align="center">What Authorisation do I have as defined by the UserInfo?</h3>
+    <pre id="user_info_roles_field"></pre>
+    <h3>The List of Buttons Below will be displayed based on your Authorisation</h3>
+    <input type="button" class="btn btn-default" id="emea-only-button" value="EMEA Only" />
+    <input type="button" class="btn btn-default" id="us-only-button" value="US Only" />
+    <input type="button" class="btn btn-default" id="apac-only-button" value="APAC Only" />
+    <input type="button" class="btn btn-default" id="csa-only-button" value="CSA Only" />
+    <input type="button" class="btn btn-default" id="federated-user-button" value="Federated User" />
+    <input type="button" class="btn btn-default" id="manager-only-button" value="Manager Only" />
+    <input type="button" class="btn btn-default" id="executive-only-button" value="Exec Only" />
+    <input type="button" class="btn btn-default" id="all-roles-button" value="All Roles" />
+    <input type="button" class="btn btn-default" id="all-groups-button" value="All Groups" />
+    <input type="button" class="btn btn-default" id="all-permissions-button" value="All Permissions" />
+    <input type="button" class="btn btn-default" id="no-authorisation" value="No Authorisation" />
+    <input type="button" class="btn btn-default" id="read-only-button" value="Read Content" />
+    <input type="button" class="btn btn-default" id="write-only-button" value="Write Content" />
+
+    <br>
+
+    <h5>If you have the right permissions, you'll see a text box (which you can edit if you have that permission
+      too...)</h5>
+    <textarea rows='7' style="resize:none;" class="col-sm-12" id="content-block" wrap='hard'>Auth0 provides authentication and authorization as a service. We are here to give developers and companies the building blocks they need in order to secure their applications, without having to become security experts. You can connect any application (written in any language or on any stack) to Auth0 and define the identity providers you want to use (how you want your users to log in). Based on your app's technology, choose one of our SDKs (or call our API) and hook it up to your app. Now each time a user tries to authenticate, Auth0 will verify their identity and send the required information back to your app.
+              </textarea>
+    <br>
+    <br>
+
+  </div>
+
+  <div align="right" class="col-sm-3">
+    <h3><i>By default, the Authorisation Example uses both token and id_token response types</i></h3>
+    <h3 align="center">Logout</h3>
+    <div align="center" class="col-s-2">
+      <input type="button" class="btn btn-default" id="logout-user-oauth" value="Logout">
+    </div>
+  </div>
+  <hr>
+</div>

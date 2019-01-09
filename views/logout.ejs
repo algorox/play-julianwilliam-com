@@ -1,0 +1,206 @@
+<script type="text/javascript">
+  var webAuth = new auth0.WebAuth({
+    domain: '<%= auth0_domain %>',
+    clientID: '<%= auth0_frontend_client_id %>',
+    redirectUri: '<%= redirectUri %>',
+    scope: 'openid',
+    audience: '<%= api_audience %>',
+    responseType: 'token'
+  });
+
+  var userId;
+  var userMetadata = {};
+  var auth0Manage;
+  var shareScopes;
+  var shareResponseType;
+  roles = 'https://access/roles';
+  groups = 'https://access/groups';
+  permissions = 'https://access/permissions';
+
+  function handleAuthentication() {
+
+    webAuth.parseHash({ hash: window.location.hash, __enableIdPInitiatedLogin: true }, function (err, authResult) {
+      if (err) {
+        //window.location.href='/';
+        return console.log(err);
+      }
+
+      if (authResult !== null) {
+
+        var expiry = JSON.stringify(
+          authResult.expiresIn * 1000 + new Date().getTime()
+        );
+
+        setSession(authResult.accessToken, authResult.idToken, expiry);
+
+        scheduleRenewal(expiry);
+      }
+
+      else {
+        webAuth.authorize({
+          redirectUri: '<%= redirectUri %>',
+          scope: 'openid',
+          audience: '<%= api_audience %>',
+          responseType: 'token id_token'
+        })
+        console.log('Reauth')
+      }
+    })
+  }
+
+  window.onload = handleAuthentication();
+
+  function renewToken() {
+    webAuth.checkSession({},
+      function (err, authResult) {
+        if (err) {
+          console.log(err)
+          webAuth.authorize({
+            redirectUri: '<%= redirectUri %>',
+            scope: 'openid',
+            audience: '<%= api_audience %>',
+            responseType: 'token id_token'
+          })
+        } else {
+          var expiry = JSON.stringify(
+            authResult.expiresIn * 1000 + new Date().getTime()
+          );
+          setSession(authResult.accessToken, authResult.idToken, expiry);
+          scheduleRenewal(expiry);
+        }
+      }
+    );
+  }
+
+  function scheduleRenewal(expiry) {
+    //var expiresAt = JSON.parse(window.localStorage.getItem('expires_at'));
+    var delay = expiry - Date.now();
+    if (delay > 5000) {
+      tokenRenewalTimeout = setTimeout(function () {
+        renewToken();
+      }, delay);
+    }
+  }
+
+  function parseJwt(token) {
+    var base64Url = token.split('.')[1];
+    var base64 = base64Url.replace('-', '+').replace('_', '/');
+    return JSON.parse(window.atob(base64));
+  };
+
+  function guid() {
+    function s4() {
+      return Math.floor((1 + Math.random()) * 0x10000)
+        .toString(16)
+        .substring(1);
+    }
+    return s4() + s4() + '-' + s4() + '-' + s4() + '-' +
+      s4() + '-' + s4() + s4() + s4();
+  };
+
+  //Function to create an array of Scopes set in the UI
+  function scopes() {
+    var scopesArrayChecked = [
+      $('#open-id').is(':checked'),
+      $('#-profile').is(':checked'),
+      $('#-email').is(':checked'),
+      $('#-read-current-user').is(':checked'),
+      $('#-update-current-user-metadata').is(':checked')
+    ];
+    var scopesArray = [
+      document.getElementById("open-id").value,
+      document.getElementById("-profile").value,
+      document.getElementById("-email").value,
+      document.getElementById("-read-current-user").value,
+      document.getElementById("-update-current-user-metadata").value
+    ];
+    var scopes = new Array;
+    for (i = 0; i < scopesArrayChecked.length; i++) {
+      if (scopesArrayChecked[i] === true) {
+        scopes.push(scopesArray[i]);
+      }
+    }
+    return scopes.join(" ");
+  };
+
+  //Function to create an array of Resonse Types set in the UI
+  function responseTypes() {
+    var tokenArrayChecked = [
+      $('#-token').is(':checked'),
+      $('#-id-token').is(':checked')
+    ];
+    var tokensArray = [
+      document.getElementById("-token").value,
+      document.getElementById("-id-token").value
+    ];
+    var tokens = new Array;
+    for (i = 0; i < tokenArrayChecked.length; i++) {
+      if (tokenArrayChecked[i] === true) {
+        tokens.push(tokensArray[i]);
+      }
+    }
+    return tokens.join(" ");
+  };
+
+  function setSession(access_token, id_token, expires_in) {
+    webAuth.client.userInfo(access_token, function (err, user) {
+      if (err) {
+        return alert('error fetching profile: ' + JSON.stringify(err));
+      }
+
+      var expiresAt = JSON.stringify(
+        expires_in * 1000 + new Date().getTime()
+      );
+
+      var access_Token = parseJwt(access_token);
+      var id_Token = parseJwt(id_token);
+      window.location.hash = '';
+
+    });
+  }
+
+  // UI event handlers
+  $(function () {
+
+    $('#logout-user-oauth').click(function (e) {
+      e.preventDefault();
+      webAuth.logout({ client_id: '<%= auth0_frontend_client_id %>', returnTo: '<%= base_url %>/', federate: true });
+    });
+
+  });
+
+</script>
+
+<div align="center" class="row">
+  <br>
+  <div class="col-sm-2">
+    <img src="http://www.indinnovation.com/images/icons/innovation.png" height="100" width="100">
+  </div>
+  <div class="col-sm-8">
+    <h1 align="center">Password Reset</h1>
+  </div>
+  <div class="col-sm-2">
+  </div>
+</div>
+
+<hr>
+
+<div class="row">
+  <div class="col-sm-3">
+
+  </div>
+
+  <div align="center" class="col-sm-6">
+    <h3>You have successfully reset your password</h3>
+    <input type="button" class="btn btn-default" id="logout-user-oauth" value="Logout">
+  </div>
+
+  <div align="center" class="col-s-3">
+
+  </div>
+
+</div>
+
+</div>
+
+<hr>

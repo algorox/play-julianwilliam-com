@@ -1,0 +1,78 @@
+<script type="text/javascript">
+
+
+
+  function parseJwt(token) {
+    var base64Url = token.split('.')[1];
+    var base64 = base64Url.replace('-', '+').replace('_', '/');
+    return JSON.parse(window.atob(base64));
+  };
+
+  tokenInfo = parseJwt('<%= progressive_profiling_token %>');
+
+  $(function () {
+
+
+
+    $('#users-info').text(JSON.stringify(tokenInfo, null, '  '));
+    document.getElementById("email-text-entry").value = tokenInfo.email;
+    document.getElementById("nickname-text-entry").value = tokenInfo.nickname;
+
+
+
+    $('#send-me-back').click(function (e) {
+      e.preventDefault();
+      window.location = "https://" + '<%= auth0_domain %>' + "/continue?state=" + '<%= state %>'
+    });
+
+
+
+    $('#verify-token').click(function (e) {
+      e.preventDefault();
+      $.ajax({
+        method: "GET",
+        url: '<%= api_host %>' + "/api/public/checkMyJWT?token=" + '<%= progressive_profiling_token %>',
+        success: function (data) {
+          alert(JSON.stringify(data))
+        },
+        error: function (data) {
+          alert(JSON.stringify(data))
+        }
+      });
+    });
+
+  });
+
+</script>
+
+<div>
+  <div align="center" class="row">
+    <br>
+    <div class="col-sm-2">
+      <img src="http://www.indinnovation.com/images/icons/innovation.png" height="100" width="100">
+    </div>
+    <div class="col-sm-8">
+      <h1 align="center">Progressive Profiling Example</h1>
+    </div>
+    <div class="col-sm-2">
+      <a class="btn btn-default" href="/" role="button">Home</a>
+    </div>
+  </div>
+
+  <div id="get_profile_row" class="row">
+    <h3 align="center"><i>Here's the info we sent in the JWT for the Redirect to Progressive Profiling</i></h3>
+    <pre align="center" id="users-info"></pre>
+    <form align="center">
+      Email Address:<br>
+      <input type="text" id="email-text-entry" name="firstname" value="email"><br>
+      Nickname:<br>
+      <input type="text" id="nickname-text-entry" name="lastname" value="nickname">
+    </form>
+    <div align="center" class="col-m-6">
+      <h3 align="center"><i>Click below when you're ready to <b>continue</b> your journey</i></h3>
+      <input type="button" align="center" class="btn btn-default" id="send-me-back" value="Continue" />
+      <br>
+      <h3 align="center"><i>Click below to do a <b>secure</b> verification of the token against a secured backend API</i></h3>
+      <input type="button" align="center" class="btn btn-default" id="verify-token" value="Verify Token" />
+    </div>
+  </div>
